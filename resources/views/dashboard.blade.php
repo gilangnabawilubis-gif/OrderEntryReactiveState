@@ -13,7 +13,7 @@
 </div>
 
 <div class="row g-3">
-    <div class="col-md-6">
+    <div class="col-md-6 col-xl-3">
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <div class="text-muted">Jumlah Product</div>
@@ -24,12 +24,34 @@
         </div>
     </div>
 
-    <div class="col-md-6">
+    <div class="col-md-6 col-xl-3">
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <div class="text-muted">Jumlah Menu</div>
                 <div class="display-5 fw-semibold">
                     {{ $jumlahMenu }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="text-muted">Penjualan Hari Ini</div>
+                <div class="h2 fw-semibold mb-0">
+                    Rp {{ number_format($totalPenjualanHariIni, 0, ',', '.') }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="text-muted">Profit Hari Ini</div>
+                <div class="h2 fw-semibold mb-0">
+                    Rp {{ number_format($totalProfitHariIni, 0, ',', '.') }}
                 </div>
             </div>
         </div>
