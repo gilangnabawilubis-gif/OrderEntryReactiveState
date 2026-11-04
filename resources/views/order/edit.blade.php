@@ -12,14 +12,14 @@
     <div class="card mb-3"><div class="card-body row g-3">
       <div class="col-md-3"><label class="form-label">Meja</label>
         <select v-model="mejaId" class="form-select"
-          :disabled="loadingMeja || !meja.length">
+          :disabled="loadingMeja || !mejaList.length">
           <option value="">Pilih Meja</option>
-          <option v-for="m in meja" :key="m.id" :value="m.id">
-            @{{ m.kode }} — @{{ m.nama }}@{{ !m.aktif ? ' (tidak aktif)' : '' }}
+          <option v-for="m in mejaList" :key="m.id" :value="m.id">
+            @{{ m.kode }} — @{{ m.nama }}
           </option>
         </select>
-        <small v-if="!loadingMeja && !meja.length" class="text-danger">
-          Tidak ada meja tersedia. Silakan coba lagi setelah meja tersedia.
+        <small v-if="!loadingMeja && !mejaList.length" class="text-danger">
+          Tidak ada meja tersedia.
         </small></div>
       <div class="col-md-4"><label class="form-label">Menu</label>
         <select v-model="menuId" class="form-select"><option value="">Pilih</option>
@@ -69,7 +69,7 @@ createApp({setup(){
   const API_MENUS=@json(url('/api/menus'));
   const API_MEJA=@json(url('/api/meja/available'));
   const ORDER_PAGE=@json(url('/order'));
-  const menus=ref([]),meja=ref([]),mejaId=ref(''),status=ref(''),items=ref([]);
+  const menus=ref([]),mejaList=ref([]),mejaId=ref(''),status=ref(''),items=ref([]);
   const menuId=ref(''),picked=ref(''),qty=ref(1);
   const loading=ref(true),saving=ref(false),error=ref('');
   const loadingMeja=ref(true);
@@ -81,7 +81,7 @@ createApp({setup(){
       fetch(API_MENUS),fetch(`${API_ORDERS}/${orderId}`),
       fetch(`${API_MEJA}?order_id=${orderId}`)]);
       if(!mr.ok||!or.ok||!mejar.ok)throw Error('Gagal memuat data edit');
-      menus.value=await mr.json();meja.value=await mejar.json();
+      menus.value=await mr.json();mejaList.value=await mejar.json();
       const o=await or.json();
       mejaId.value=o.meja_id;status.value=o.status;
       items.value=o.details.map(d=>({menu_detail_id:d.menu_detail_id,
@@ -114,12 +114,12 @@ createApp({setup(){
         menu_detail_id:i.menu_detail_id,qty:i.qty
       }))})});
       const j=await r.json();if(!r.ok)throw Error(
-        j.errors?.meja_id?.[0]||j.message||'Gagal update');
+        j.errors?.meja_id?.[0]||j.errors?.meja?.[0]||j.message||'Gagal update');
       window.location.href=ORDER_PAGE;
     }catch(e){error.value=e.message;}finally{saving.value=false;}
   }
   onMounted(load);
-  return{menus,meja,mejaId,loadingMeja,status,items,menuId,picked,qty,options,
+  return{menus,mejaList,mejaId,loadingMeja,status,items,menuId,picked,qty,options,
     total,rupiah,loading,saving,error,addItem,save};
 }}).mount('#orderEditApp');
 </script>

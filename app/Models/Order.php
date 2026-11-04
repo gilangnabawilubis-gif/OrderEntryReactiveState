@@ -12,8 +12,7 @@ class Order extends Model {
         'change_amount'=>'integer','meja_id'=>'integer','checked_out_at'=>'datetime',
         'cancelled_at'=>'datetime'
     ];
-    public function meja()
-    {
+    public function mejaMaster() {
         return $this->belongsTo(Meja::class, 'meja_id');
     }
     public function details() {

@@ -11,14 +11,14 @@
     <div class="col-md-3">
       <label class="form-label">Meja</label>
       <select v-model="mejaId" class="form-select"
-        :disabled="loadingMeja || !meja.length">
+        :disabled="loadingMeja || !mejaList.length">
         <option value="">Pilih Meja</option>
-        <option v-for="m in meja" :key="m.id" :value="m.id">
-          @{{ m.kode }} — @{{ m.nama }}@{{ !m.aktif ? ' (tidak aktif)' : '' }}
+        <option v-for="m in mejaList" :key="m.id" :value="m.id">
+          @{{ m.kode }} — @{{ m.nama }}
         </option>
       </select>
-      <small v-if="!loadingMeja && !meja.length" class="text-danger">
-        Tidak ada meja tersedia. Silakan coba lagi setelah meja tersedia.
+      <small v-if="!loadingMeja && !mejaList.length" class="text-danger">
+        Tidak ada meja tersedia.
       </small>
     </div>
     <div class="col-md-4">
@@ -71,7 +71,7 @@
 <script>
 const { createApp, ref, computed, onMounted } = Vue;
 createApp({ setup() {
-  const menus=ref([]), meja=ref([]), mejaId=ref(''), menuId=ref(''), picked=ref('');
+  const menus=ref([]), mejaList=ref([]), mejaId=ref(''), menuId=ref(''), picked=ref('');
   const qty=ref(1), items=ref([]), error=ref(''), saving=ref(false);
   const loadingMeja=ref(true);
   const API_MENUS=@json(url('/api/menus'));
@@ -87,8 +87,9 @@ createApp({ setup() {
     catch(e) { error.value=e.message; }
   }
   async function loadMeja() {
-    try { const r=await fetch(API_MEJA); if(!r.ok) throw Error('Daftar meja gagal dimuat');
-      meja.value=await r.json(); }
+    try { const r=await fetch(API_MEJA);
+      if(!r.ok) throw Error('Daftar meja gagal dimuat');
+      mejaList.value=await r.json(); }
     catch(e) { error.value=e.message; }
     finally { loadingMeja.value=false; }
   }
@@ -115,12 +116,12 @@ createApp({ setup() {
           menu_detail_id:i.menu_detail_id,qty:i.qty
         }))})});
       const j=await r.json();if(!r.ok) throw Error(
-        j.errors?.meja_id?.[0]||j.message||'Gagal simpan Order');
+        j.errors?.meja_id?.[0]||j.errors?.meja?.[0]||j.message||'Gagal simpan Order');
       window.location.href=ORDER_PAGE;
     } catch(e) { error.value=e.message; } finally { saving.value=false; }
   }
   onMounted(()=>{loadMenus();loadMeja();});
-  return {menus,meja,mejaId,loadingMeja,menuId,picked,qty,items,error,saving,options,
+  return {menus,mejaList,mejaId,loadingMeja,menuId,picked,qty,items,error,saving,options,
     total,rupiah,addItem,save};
 }}).mount('#orderAddApp');
 </script>

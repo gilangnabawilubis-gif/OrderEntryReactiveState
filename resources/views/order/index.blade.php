@@ -10,27 +10,24 @@
   <div class="card"><div class="table-responsive">
     <table class="table table-hover mb-0"><thead class="table-light"><tr>
       <th>Kode</th><th>Meja</th><th>Item</th><th>Total</th>
-      <th>Status</th><th>Tanggal &amp; Waktu Checkout</th><th>Aksi</th>
+      <th>Status</th><th>Aksi</th>
     </tr></thead><tbody>
       <tr v-for="o in orders" :key="o.id">
-        <td>@{{ o.kode_order }}</td><td>@{{ o.meja?.nama || o.meja || '—' }}</td>
+        <td>@{{ o.kode_order }}</td><td>@{{ o.meja }}</td>
         <td>@{{ o.details.length }}</td>
         <td>Rp @{{ rupiah(o.total) }}</td>
         <td><span class="badge" :class="o.status==='active'?'bg-primary':
-             (o.status==='completed'?'bg-success':'bg-secondary')">
+             'bg-secondary'">
           @{{ o.status }}
         </span></td>
-        <td>@{{ o.checked_out_at ? formatDateTime(o.checked_out_at) : '—' }}</td>
         <td>
           <template v-if="o.status==='active'">
             <a :href="`${ORDER_PAGE}/${o.id}/edit`"
                class="btn btn-sm btn-outline-primary me-1">Edit</a>
-            <a :href="`${ORDER_PAGE}/${o.id}/checkout`"
-               class="btn btn-sm btn-success me-1">Checkout</a>
             <button @click="cancelOrder(o)"
                class="btn btn-sm btn-outline-danger">Cancel</button>
           </template>
-          <small v-else class="text-muted">Final</small>
+          <small v-else class="text-muted">Dibatalkan / final</small>
         </td>
       </tr>
     </tbody></table>
@@ -45,9 +42,6 @@ createApp({setup(){
   const API_ORDERS=@json(url('/api/orders'));
   const ORDER_PAGE=@json(url('/order'));
   const rupiah=n=>new Intl.NumberFormat('id-ID').format(n||0);
-  const formatDateTime=value=>new Intl.DateTimeFormat('id-ID',{
-    dateStyle:'medium',timeStyle:'short'
-  }).format(new Date(value));
   async function load(){
     try{const r=await fetch(API_ORDERS);if(!r.ok) throw Error('Gagal muat order');
       orders.value=await r.json();}
@@ -62,7 +56,7 @@ createApp({setup(){
     catch(e){error.value=e.message;}
   }
   onMounted(load);
-  return {orders,error,ORDER_PAGE,rupiah,formatDateTime,cancelOrder};
+  return {orders,error,ORDER_PAGE,rupiah,cancelOrder};
 }}).mount('#orderIndexApp');
 </script>
 @endpush

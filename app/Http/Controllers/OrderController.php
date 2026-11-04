@@ -12,9 +12,6 @@ class OrderController extends Controller {
     public function index() { return view('order.index'); }
     public function create() { return view('order.add'); }
     public function edit($id) { return view('order.edit', ['id'=>$id]); }
-    public function checkoutPage($id) {
-        return view('order.checkout', ['id'=>$id]);
-    }
     public function availableMeja(Request $request) {
         $data = $request->validate([
             'order_id'=>['sometimes','integer','exists:tbl_order,id']
@@ -44,16 +41,17 @@ class OrderController extends Controller {
         return response()->json($meja);
     }
     public function data() {
-        return response()->json(Order::with('meja', 'details.menuDetail.product')
+        return response()->json(Order::with('mejaMaster', 'details.menuDetail.product')
             ->orderByDesc('id')->get());
     }
     public function show($id) {
-        return response()->json(Order::with('meja', 'details.menuDetail.product')
+        return response()->json(Order::with('mejaMaster', 'details.menuDetail.product')
             ->findOrFail($id));
     }
     private function rules() {
         return [
-            'meja_id'=>['required','integer','exists:tbl_meja,id'],
+            'meja_id'=>['required_without:meja','nullable','integer','exists:tbl_meja,id'],
+            'meja'=>['required_without:meja_id','nullable','string','max:100'],
             'items'=>['required','array','min:1'],
             'items.*.menu_detail_id'=>[
                 'required','integer','exists:tbl_menu_detail,id','distinct'
@@ -82,8 +80,21 @@ class OrderController extends Controller {
             ]);
         }
     }
-    private function lockAvailableMeja($mejaId, ?Order $order = null) {
-        $meja = Meja::whereKey($mejaId)->lockForUpdate()->firstOrFail();
+    private function lockAvailableMeja(array $data, ?Order $order = null) {
+        if (!empty($data['meja_id'])) {
+            $meja = Meja::whereKey($data['meja_id'])->lockForUpdate()->firstOrFail();
+        } else {
+            $label = trim($data['meja']);
+            $meja = Meja::where(function ($query) use ($label) {
+                $query->where('kode', $label)->orWhere('nama', $label);
+            })->lockForUpdate()->first();
+            if (!$meja) {
+                throw ValidationException::withMessages([
+                    'meja'=>'Pilih meja yang terdaftar pada master meja.'
+                ]);
+            }
+        }
+
         if (!$meja->aktif && (!$order || (int)$order->meja_id !== (int)$meja->id)) {
             throw ValidationException::withMessages([
                 'meja_id'=>'Meja tidak aktif dan tidak dapat dipilih.'
@@ -98,6 +109,7 @@ class OrderController extends Controller {
                 'meja_id'=>'Meja sudah dipakai order aktif. Silakan pilih meja lain.'
             ]);
         }
+
         return $meja;
     }
     private function withMejaConflictHandling(callable $operation) {
@@ -105,12 +117,9 @@ class OrderController extends Controller {
         catch (QueryException $e) {
             $driverCode = (string)($e->errorInfo[1] ?? '');
             $sqlState = (string)($e->errorInfo[0] ?? $e->getCode());
-            $message = strtolower($e->getMessage());
-            $isUniqueViolation = $driverCode === '1062'
-                || $sqlState === '23505'
+            if ($driverCode === '1062' || $sqlState === '23505'
                 || $driverCode === '19'
-                || str_contains($message, 'unique constraint failed');
-            if ($isUniqueViolation) {
+                || str_contains(strtolower($e->getMessage()), 'unique constraint failed')) {
                 throw ValidationException::withMessages([
                     'meja_id'=>'Meja sudah dipakai order aktif, atau item duplikat.'
                 ]);
@@ -122,10 +131,10 @@ class OrderController extends Controller {
         $data = $request->validate($this->rules());
         return $this->withMejaConflictHandling(function () use ($data) {
             $order = DB::transaction(function () use ($data) {
-                $meja = $this->lockAvailableMeja($data['meja_id']);
+                $meja = $this->lockAvailableMeja($data);
                 $items = $this->calculatedItems($data['items']);
                 $order = Order::create([
-                    'meja'=>$meja->nama,'meja_id'=>$meja->id,
+                    'meja'=>$meja->kode,'meja_id'=>$meja->id,
                     'active_meja_key'=>'MEJA:'.$meja->id,
                     'status'=>'active','total'=>$this->totalItems($items)
                 ]);
@@ -137,19 +146,17 @@ class OrderController extends Controller {
             });
             return response()->json(['status'=>'success',
                 'message'=>'Order aktif dibuat.',
-                'data'=>$order->load('meja', 'details.menuDetail.product')], 201);
+                'data'=>$order->load('mejaMaster', 'details.menuDetail.product')], 201);
         });
     }
 
-    
-
-    public function update(Request $request, $id) {
+        public function update(Request $request, $id) {
         $data = $request->validate($this->rules());
         return $this->withMejaConflictHandling(function () use ($id,$data) {
             $order = DB::transaction(function () use ($id,$data) {
                 $order = Order::whereKey($id)->lockForUpdate()->firstOrFail();
                 $this->activeOnly($order);
-                $meja = $this->lockAvailableMeja($data['meja_id'], $order);
+                $meja = $this->lockAvailableMeja($data, $order);
                 $old = $order->details()->get()->keyBy('menu_detail_id');
                 $items = $this->calculatedItems($data['items']);
                 // Saat edit, harga item yang sudah ada tetap harga snapshot.
@@ -162,7 +169,7 @@ class OrderController extends Controller {
                 unset($item);
                 $order->details()->delete();
                 $order->details()->createMany($items);
-                $order->update(['meja'=>$meja->nama,
+                $order->update(['meja'=>$meja->kode,
                     'meja_id'=>$meja->id,
                     'active_meja_key'=>'MEJA:'.$meja->id,
                     'total'=>$this->totalItems($items)]);
@@ -170,7 +177,7 @@ class OrderController extends Controller {
             });
             return response()->json(['status'=>'success',
                 'message'=>'Order aktif diperbarui.',
-                'data'=>$order->load('meja', 'details.menuDetail.product')]);
+                'data'=>$order->load('mejaMaster', 'details.menuDetail.product')]);
         });
     }
     public function cancel($id) {
@@ -183,28 +190,5 @@ class OrderController extends Controller {
         });
         return response()->json(['status'=>'success',
             'message'=>'Order dibatalkan; meja dilepas.', 'data'=>$order]);
-    }
-    public function checkout(Request $request, $id) {
-        $data = $request->validate([
-            'paid_amount'=>['required','integer','min:0']
-        ]);
-        $order = DB::transaction(function () use ($id,$data) {
-            $order = Order::whereKey($id)->lockForUpdate()->firstOrFail();
-            $this->activeOnly($order);
-            $total = (int)$order->details()->sum('subtotal');
-            $paid = (int)$data['paid_amount'];
-            if ($paid < $total) {
-                throw ValidationException::withMessages([
-                    'paid_amount'=>'Nominal bayar kurang dari total.'
-                ]);
-            }
-            $order->update(['total'=>$total,'paid_amount'=>$paid,
-                'change_amount'=>$paid-$total,
-                'checked_out_at'=>now(),'status'=>'completed',
-                'active_meja_key'=>null]);
-            return $order;
-        });
-        return response()->json(['status'=>'success',
-            'message'=>'Checkout berhasil; meja dilepas.', 'data'=>$order]);
     }
 }
